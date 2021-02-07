@@ -11,31 +11,26 @@ class Project:
             raise ValueError(f"Could not retrieve stats for project id {project_id}.")
         self.data = json.loads(r.text)
 
-        self.contributions = None
-        self.progress = None
-
     def __getitem__(self, key):
         if key == "contributions":
-            if self.contributions is None:
-                self._load_contributions()
-            return self.contributions
+            if "contributions" not in self.data:
+                self.data["contributions"] = self._get_contributions()
         elif key == "progress":
-            if self.progress is None:
-                self._load_progress()
-            return self.progress
+            if "progress" not in self.data:
+                self.data["progress"] = self._get_progress()
         return self.data[key]
 
-    def _load_contributions(self):
+    def _get_contributions(self):
         r = requests.get(f"https://tasking-manager-tm4-production-api.hotosm.org/api/v2/projects/{self.project_id}/contributions/")
         if r.status_code != 200:
             raise ValueError(f"Could not retrieve stats for project id {self.project_id}.")
-        self.contributions = json.loads(r.text)
+        return json.loads(r.text)
 
-    def _load_progress(self):
+    def _get_progress(self):
         r = requests.get(f"https://tasking-manager-tm4-production-api.hotosm.org/api/v2/projects/{self.project_id}/contributions/queries/day/")
         if r.status_code != 200:
             raise ValueError(f"Could not retrieve stats for project id {self.project_id}.")
-        self.progress = json.loads(r.text)
+        return json.loads(r.text)
 
     def get_progress_df(self):
 
@@ -44,10 +39,7 @@ class Project:
         except:
             raise ModuleNotFoundError("pandas is required to get a progress dataframe.")
 
-        if self.progress is None:
-            self._load_progress()
-
-        df = pd.DataFrame.from_records(self.progress["stats"])
+        df = pd.DataFrame.from_records(self["progress"]["stats"])
         start_date, end_date = df.iloc[0]["date"], df.iloc[-1]["date"]
         idx = pd.date_range(start_date, end_date)
         df = df.set_index("date")
@@ -69,10 +61,7 @@ class Project:
         except:
             raise ModuleNotFoundError("pandas is required to get a progress dataframe.")
 
-        if self.contributions is None:
-            self._load_contributions()
-
-        contrib_stats = self.contributions["userContributions"].copy()
+        contrib_stats = self["contributions"]["userContributions"].copy()
         for contribution in contrib_stats:
             del contribution["mappedTasks"]
             del contribution["validatedTasks"]
